@@ -14,18 +14,26 @@ import os
 # editais, avisos). O pedido original é sobre a Seção 2.
 DOU_SECAO = os.getenv("DOU_SECAO", "do2")
 
-# Palavras-chave usadas para filtrar as publicações do dia. A busca é feita
-# de forma "contém" (case-insensitive e sem acentuação), olhando o título,
-# a ementa e o nome do órgão/unidade de cada publicação.
+# IMPORTANTE (corrigido em 05/07/2026): estes nomes são usados para
+# filtrar pelo ÓRGÃO PUBLICADOR do ato (equivalente aos parâmetros
+# "org"/"org_sub" do link oficial de busca do DOU), e NÃO por menções no
+# texto do artigo. Isso evita trazer publicações de outros ministérios
+# que apenas citam o MDIC/Inmetro de passagem (ex.: cessão de servidor).
 DOU_KEYWORDS = [
     kw.strip()
     for kw in os.getenv(
         "DOU_KEYWORDS",
-        "MDIC,INMETRO,Instituto Nacional de Metrologia,"
-        "Ministério do Desenvolvimento, Indústria, Comércio e Serviços",
+        "MDIC,Ministério do Desenvolvimento, Indústria, Comércio e Serviços,"
+        "Inmetro,Instituto Nacional de Metrologia, Qualidade e Tecnologia",
     ).split(",")
     if kw.strip()
 ]
+
+# Ativa logs com os atributos brutos de cada <article> do XML do INLABS.
+# Usado temporariamente para confirmar qual campo carrega o link/slug
+# amigável do artigo (ver nota em dou_client.py sobre o link "Abrir no
+# DOU"). Depois de confirmado o campo certo, pode voltar para "false".
+DOU_DEBUG_XML_ATTRS = os.getenv("DOU_DEBUG_XML_ATTRS", "false").lower() == "true"
 
 # ---------------------------------------------------------------------------
 # INLABS — fonte oficial de dados do DOU para automações (ver dou_client.py)
@@ -40,8 +48,9 @@ REPORTS_DIR = os.getenv("REPORTS_DIR", "reports")
 
 # Pasta usada pelo GitHub Pages para publicar a página HTML pública do
 # monitoramento (ver src/html_generator.py). O GitHub Pages, quando
-# configurado como "branch: main / folder: docs", serve automaticamente
-# o conteúdo desta pasta em https://SEU-USUARIO.github.io/SEU-REPO/
+# configurado com "Source: GitHub Actions" (ver README), serve
+# automaticamente o conteúdo desta pasta em
+# https://SEU-USUARIO.github.io/SEU-REPO/
 DOCS_DIR = os.getenv("DOCS_DIR", "docs")
 
 # ---------------------------------------------------------------------------
