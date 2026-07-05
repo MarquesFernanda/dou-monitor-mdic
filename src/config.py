@@ -28,6 +28,12 @@ DOU_KEYWORDS = [
 ]
 
 # ---------------------------------------------------------------------------
+# INLABS — fonte oficial de dados do DOU para automações (ver dou_client.py)
+# ---------------------------------------------------------------------------
+INLABS_EMAIL = os.getenv("INLABS_EMAIL", "")
+INLABS_SENHA = os.getenv("INLABS_SENHA", "")
+
+# ---------------------------------------------------------------------------
 # Saída (relatório Word)
 # ---------------------------------------------------------------------------
 REPORTS_DIR = os.getenv("REPORTS_DIR", "reports")
