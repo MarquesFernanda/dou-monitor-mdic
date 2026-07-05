@@ -94,6 +94,52 @@ def _build_historico_html(historico: list) -> str:
     )
 
 
+def generate_error_page(
+    error_message: str,
+    docs_dir: Union[str, Path] = "docs",
+) -> Path:
+    """Gera uma página avisando que a checagem de hoje falhou, em vez de
+    deixar a página anterior (ou nenhuma página) sem explicação. Usada
+    quando o DOU está indisponível/bloqueando acesso automatizado."""
+    docs_dir = Path(docs_dir)
+    docs_dir.mkdir(parents=True, exist_ok=True)
+
+    agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
+    pagina = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoramento Diário DOU - MDIC/Inmetro</title>
+<meta http-equiv="refresh" content="1800">
+<style>
+  body {{ font-family: -apple-system, Segoe UI, Arial, sans-serif; margin: 0;
+         padding: 24px; background: #f4f6f8; color: #1f2933; }}
+  .container {{ max-width: 720px; margin: 40px auto; background: #fff;
+                border-radius: 8px; padding: 24px 32px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }}
+  h1 {{ color: #b71c1c; font-size: 1.3rem; }}
+  footer {{ margin-top: 24px; font-size: .78rem; color: #9aa5b1; }}
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚠️ Não foi possível verificar o DOU hoje</h1>
+    <p>A automação tentou consultar o Diário Oficial da União em {_esc(agora)}
+    e não conseguiu. Verifique manualmente em
+    <a href="https://www.in.gov.br/leiturajornal" target="_blank" rel="noopener">in.gov.br/leiturajornal</a>.</p>
+    <p><em>{_esc(error_message)}</em></p>
+    <footer>A próxima tentativa automática ocorre amanhã às 8h (Brasília).</footer>
+  </div>
+</body>
+</html>
+"""
+    index_path = docs_dir / "index.html"
+    index_path.write_text(pagina, encoding="utf-8")
+    logger.info("Página de erro gerada em %s", index_path)
+    return index_path
+
+
 def generate_html_page(
     publicacoes: List[Publicacao],
     reference_date: date,
