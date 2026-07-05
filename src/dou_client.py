@@ -45,9 +45,10 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-INLABS_LOGIN_URL = "https://inlabs.in.gov.br/logaudio.php"
+INLABS_LOGIN_URL = "https://inlabs.in.gov.br/logar.php"
 INLABS_DOWNLOAD_URL = "https://inlabs.in.gov.br/index.php"
 INLABS_LEITURA_URL = "https://www.in.gov.br/leiturajornal"
+INLABS_SESSION_COOKIE_NAME = "inlabs_session_cookie"
 
 USER_AGENT = (
     "MonitoramentoDOU-MDIC/1.0 "
@@ -103,7 +104,8 @@ def get_reference_date(today: Optional[date] = None) -> date:
     return ref
 
 
-def _login(session: requests.Session, email: str, password: str, timeout: int) -> None:
+def _login(session: requests.Session, email: str, password: str, timeout: int) -> str:
+    """Autentica no INLABS e retorna o valor do cookie de sessão."""
     if not email or not password:
         raise InlabsAuthError(
             "INLABS_EMAIL/INLABS_SENHA não configurados (verifique os GitHub Secrets)."
@@ -111,39 +113,54 @@ def _login(session: requests.Session, email: str, password: str, timeout: int) -
     resp = session.post(
         INLABS_LOGIN_URL,
         data={"email": email, "password": password},
-        headers={"User-Agent": USER_AGENT},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": USER_AGENT,
+        },
         timeout=timeout,
     )
-    # O INLABS não usa códigos HTTP de erro padronizados para login inválido
-    # em todos os casos, então checamos também se algum cookie de sessão foi
-    # de fato recebido.
-    if resp.status_code >= 400 or not session.cookies:
+    cookie_value = session.cookies.get(INLABS_SESSION_COOKIE_NAME)
+    if resp.status_code >= 400 or not cookie_value:
         raise InlabsAuthError(
             f"Falha ao autenticar no INLABS (status {resp.status_code}). "
             "Confira o e-mail/senha configurados nos GitHub Secrets "
             "INLABS_EMAIL e INLABS_SENHA."
         )
+    return cookie_value
 
 
 def _download_zip(
-    session: requests.Session, reference_date: date, secao: str, timeout: int
+    session: requests.Session,
+    cookie_value: str,
+    reference_date: date,
+    secao: str,
+    timeout: int,
 ) -> bytes:
-    params = {"p": reference_date.strftime("%d-%m-%Y"), "dl": secao.upper()}
+    data_completa = reference_date.strftime("%Y-%m-%d")
+    secao_upper = secao.upper()
+    nome_arquivo = f"{data_completa}-{secao_upper}.zip"
     resp = session.get(
         INLABS_DOWNLOAD_URL,
-        params=params,
-        headers={"User-Agent": USER_AGENT},
+        params={"p": data_completa, "dl": nome_arquivo},
+        headers={
+            "Cookie": f"{INLABS_SESSION_COOKIE_NAME}={cookie_value}",
+            "origem": "736372697074",
+            "User-Agent": USER_AGENT,
+        },
         timeout=timeout,
     )
-    resp.raise_for_status()
-    content_type = resp.headers.get("Content-Type", "")
-    if "zip" not in content_type and resp.content[:2] != b"PK":
-        # Não veio um .zip de verdade — provavelmente não há edição para
-        # essa data/seção (ex.: feriado não previsto na lib `holidays`,
-        # ou edição extra ainda não publicada).
+    if resp.status_code == 404:
+        # Padrão oficial do INLABS para "não há edição publicada nessa
+        # data/seção" (ex.: feriado, ou edição ainda não publicada).
         raise DouUnavailableError(
-            f"O INLABS não retornou um arquivo .zip para {params['p']} "
-            f"(seção {params['dl']}). Pode não haver edição nessa data."
+            f"O INLABS não encontrou edição para {nome_arquivo} "
+            f"(pode não ter havido publicação nessa seção/data)."
+        )
+    resp.raise_for_status()
+    if resp.content[:2] != b"PK":
+        raise DouUnavailableError(
+            f"O INLABS não retornou um arquivo .zip válido para {nome_arquivo}."
         )
     return resp.content
 
@@ -231,8 +248,8 @@ def search_dou(
     for attempt in range(1, max_retries + 1):
         try:
             session = requests.Session()
-            _login(session, inlabs_email, inlabs_password, timeout)
-            zip_bytes = _download_zip(session, ref_date, secao, timeout)
+            cookie_value = _login(session, inlabs_email, inlabs_password, timeout)
+            zip_bytes = _download_zip(session, cookie_value, ref_date, secao, timeout)
             break
         except InlabsAuthError:
             # Credenciais erradas não se resolvem tentando de novo.
