@@ -28,7 +28,7 @@ except ImportError:
 from . import config
 from .dou_client import DouUnavailableError, search_dou
 from .email_notifier import EmailNotificationError, send_email_report
-from .html_generator import generate_html_page
+from .html_generator import generate_error_page, generate_html_page
 from .report_generator import generate_report
 from .teams_notifier import TeamsNotificationError, send_teams_alert, send_teams_message
 
@@ -66,18 +66,28 @@ def run() -> int:
             secao=config.DOU_SECAO,
             max_retries=config.MAX_RETRIES,
             timeout=config.REQUEST_TIMEOUT,
+            inlabs_email=config.INLABS_EMAIL,
+            inlabs_password=config.INLABS_SENHA,
         )
     except DouUnavailableError as exc:
         logger.error("Falha ao consultar o DOU: %s", exc)
-        # Nunca falha em silêncio: avisa no Teams que a checagem de hoje
-        # não pôde ser concluída, para alguém verificar manualmente.
+        # Nunca falha em silêncio: gera uma página avisando que a checagem
+        # de hoje não pôde ser concluída, para quem acessar saber o motivo
+        # em vez de ver um 404 ou a página do dia anterior sem aviso.
+        try:
+            generate_error_page(str(exc), docs_dir=config.DOCS_DIR)
+        except Exception:
+            logger.exception("Falha ao gerar a página de erro (docs/index.html).")
         if "teams" in methods:
             send_teams_alert(
                 config.TEAMS_WEBHOOK_URL,
                 f"O monitoramento do DOU falhou hoje: {exc}. "
                 f"Verifique manualmente em https://www.in.gov.br/leiturajornal",
             )
-        return 1
+        # Retorna 0 (não marca a Action como "failed"): o bloqueio do DOU é
+        # um problema externo e recorrente (ver README), não um bug da
+        # automação. O importante é que a página já avisa sobre a falha.
+        return 0
 
     # 2) Gerar o relatório em Word ------------------------------------------
     filename = f"relatorio_dou_mdic_{reference_date.isoformat()}.docx"
