@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoramento Diário DOU - MDIC/Inmetro</title>
+<meta http-equiv="refresh" content="1800">
+<style>
+  body { font-family: -apple-system, Segoe UI, Arial, sans-serif; margin: 0;
+         padding: 24px; background: #f4f6f8; color: #1f2933; }
+  .container { max-width: 720px; margin: 40px auto; background: #fff;
+                border-radius: 8px; padding: 24px 32px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  h1 { color: #b71c1c; font-size: 1.3rem; }
+  footer { margin-top: 24px; font-size: .78rem; color: #9aa5b1; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚠️ Não foi possível verificar o DOU hoje</h1>
+    <p>A automação tentou consultar o Diário Oficial da União em 05/07/2026 às 21:07
+    e não conseguiu. Verifique manualmente em
+    <a href="https://www.in.gov.br/leiturajornal" target="_blank" rel="noopener">in.gov.br/leiturajornal</a>.</p>
+    <p><em>Falha ao autenticar no INLABS (status 404). Confira o e-mail/senha configurados nos GitHub Secrets INLABS_EMAIL e INLABS_SENHA.</em></p>
+    <footer>A próxima tentativa automática ocorre amanhã às 8h (Brasília).</footer>
+  </div>
+</body>
+</html>
