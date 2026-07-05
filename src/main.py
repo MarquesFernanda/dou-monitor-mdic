@@ -68,6 +68,7 @@ def run() -> int:
             timeout=config.REQUEST_TIMEOUT,
             inlabs_email=config.INLABS_EMAIL,
             inlabs_password=config.INLABS_SENHA,
+            debug_xml_attrs=config.DOU_DEBUG_XML_ATTRS,
         )
     except DouUnavailableError as exc:
         logger.error("Falha ao consultar o DOU: %s", exc)
