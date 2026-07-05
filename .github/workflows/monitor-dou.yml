@@ -42,6 +42,10 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
 
+          # --- INLABS (fonte oficial de dados do DOU, ver src/dou_client.py) --
+          INLABS_EMAIL: ${{ secrets.INLABS_EMAIL }}
+          INLABS_SENHA: ${{ secrets.INLABS_SENHA }}
+
           # --- Busca no DOU (pode deixar como está) -----------------------
           DOU_SECAO: "do2"
           DOU_KEYWORDS: "MDIC,INMETRO,Instituto Nacional de Metrologia,Ministério do Desenvolvimento, Indústria, Comércio e Serviços"
