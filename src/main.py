@@ -118,13 +118,20 @@ def run() -> int:
 
     # 3) Notificar --------------------------------------------------------
     if "teams" in methods:
-        try:
-            send_teams_message(
-                config.TEAMS_WEBHOOK_URL, publicacoes, reference_date_str, report_link
+        if not config.TEAMS_WEBHOOK_URL:
+            logger.info(
+                "NOTIFY_METHOD inclui 'teams', mas TEAMS_WEBHOOK_URL não está "
+                "configurado — pulando notificação do Teams (isso é esperado "
+                "se você está usando só a página HTML por enquanto)."
             )
-        except TeamsNotificationError as exc:
-            logger.error("Falha ao notificar o Teams: %s", exc)
-            exit_code = 1
+        else:
+            try:
+                send_teams_message(
+                    config.TEAMS_WEBHOOK_URL, publicacoes, reference_date_str, report_link
+                )
+            except TeamsNotificationError as exc:
+                logger.error("Falha ao notificar o Teams: %s", exc)
+                exit_code = 1
 
     if "email" in methods:
         try:
