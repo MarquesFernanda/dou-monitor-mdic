@@ -56,7 +56,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           shopt -s nullglob
-          FILES=(reports/*.docx docs/index.html docs/historico.json)
+          CANDIDATOS=(reports/*.docx docs/index.html docs/historico.json)
+          FILES=()
+          for f in "${CANDIDATOS[@]}"; do
+            [ -e "$f" ] && FILES+=("$f")
+          done
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "Nada para commitar (nenhum arquivo novo gerado)."
             exit 0
