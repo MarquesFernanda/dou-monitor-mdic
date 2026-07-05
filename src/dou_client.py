@@ -19,8 +19,19 @@ Como funciona o fluxo do INLABS:
   2) GET com esse cookie em INLABS_DOWNLOAD_URL, informando data e seção
      -> devolve um arquivo .zip contendo um .xml por matéria publicada
      naquela seção, naquele dia.
-  3) Cada .xml é lido e filtrado pelas DOU_KEYWORDS (mesma lógica de
-     antes: contém, case-insensitive, sem acento).
+  3) Cada .xml é lido e filtrado por ORG_KEYWORDS (ver abaixo).
+
+CORREÇÃO IMPORTANTE (05/07/2026) — filtro estava errado:
+A versão anterior buscava as keywords dentro de TÍTULO + ÓRGÃO + TEXTO
+COMPLETO do artigo. Isso trazia publicações de QUALQUER ministério que
+apenas MENCIONASSE "MDIC" ou similar no corpo (ex.: cessão de servidor,
+portarias de pessoal de outros órgãos que citam o MDIC de passagem).
+
+O comportamento correto — o mesmo que o filtro oficial do site faz com
+os parâmetros `org` (unidade principal) e `org_sub` (unidade subordinada)
+em https://www.in.gov.br/leiturajornal — é filtrar apenas pelo ÓRGÃO
+PUBLICADOR (quem efetivamente publicou o ato), não pelo conteúdo do
+texto. Por isso `_matches_keywords` agora olha só `pub.orgao`.
 
 IMPORTANTE — sobre a estabilidade da estrutura do XML:
 O INLABS não tem uma documentação pública e versionada do schema exato de
@@ -28,6 +39,18 @@ cada tag/atributo do XML. Este código usa múltiplos nomes alternativos
 por campo (mesmo princípio da versão anterior) para resistir a pequenas
 variações. Se a Imprensa Nacional mudar a estrutura de forma mais
 profunda, os nomes em `_ATTR_*` abaixo podem precisar de ajuste.
+
+SOBRE O LINK "ABRIR NO DOU" (ver DEBUG_XML_ATTRS abaixo):
+Os links reais do site têm o formato
+`https://www.in.gov.br/web/dou/-/<slug-do-titulo>-<numero>`, não apenas
+um ID numérico. Não temos confirmação de qual atributo do XML do INLABS
+carrega esse slug completo (a Imprensa Nacional não documenta isso
+publicamente). Enquanto isso não for confirmado, o link direto pode não
+abrir corretamente — por segurança, quando não temos certeza, geramos um
+link de BUSCA (que sempre funciona) em vez de arriscar um link quebrado.
+Ative DOU_DEBUG_XML_ATTRS=true para logar os atributos brutos do XML e
+descobrir o nome certo do campo; assim que confirmado, é só adicionar
+esse nome em `_ATTR_ID` ou `_ATTR_SLUG` abaixo.
 """
 from __future__ import annotations
 
@@ -38,6 +61,7 @@ import zipfile
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
+from urllib.parse import quote
 from xml.etree import ElementTree
 
 import holidays
@@ -64,6 +88,19 @@ _ATTR_ORGAO = ("artCategory", "pubName", "hierarchyStr", "orgao", "displayName")
 _ATTR_TIPO = ("artType", "tipo", "identifica")
 _ATTR_NUMERO = ("numberDocument", "artNumber", "numero")
 _ATTR_ID = ("id", "idMateria", "identifica")
+# Possíveis nomes de um "slug" completo (título amigável usado na URL
+# pública). Ainda não confirmados contra um XML real — ver DEBUG acima.
+_ATTR_SLUG = ("urlTitle", "friendlyUrl", "slug", "idOficial", "pdfPage")
+
+# Nomes oficiais completos usados no filtro por órgão (mesmos nomes do
+# link de busca oficial do site, para bater exatamente com "MDIC" como
+# unidade principal e "Inmetro" como unidade subordinada).
+DEFAULT_ORG_KEYWORDS = (
+    "Ministério do Desenvolvimento, Indústria, Comércio e Serviços",
+    "Instituto Nacional de Metrologia, Qualidade e Tecnologia",
+    "Inmetro",
+    "MDIC",
+)
 
 
 class DouUnavailableError(Exception):
@@ -177,7 +214,27 @@ def _extract_text(elem) -> str:
     return " ".join(t.strip() for t in elem.itertext() if t and t.strip())
 
 
-def _normalize(xml_bytes: bytes, reference_date: date) -> Optional[Publicacao]:
+def _build_search_link(reference_date: date, secao: str) -> str:
+    """Link de BUSCA (não o link direto do artigo) já filtrado pelos
+    parâmetros oficiais de órgão/unidade subordinada, no mesmo formato do
+    link que abre a edição do dia com MDIC + Inmetro pré-selecionados.
+    Esse link sempre abre (é uma tela de busca do site oficial), diferente
+    de um link direto por ID que pode estar errado."""
+    org = quote("Ministério do Desenvolvimento, Indústria, Comércio e Serviços")
+    org_sub = quote("Instituto Nacional de Metrologia, Qualidade e Tecnologia")
+    data_str = reference_date.strftime("%d-%m-%Y")
+    return (
+        f"{INLABS_LEITURA_URL}?data={data_str}&secao={secao}"
+        f"&org={org}&org_sub={org_sub}#daypicker"
+    )
+
+
+def _normalize(
+    xml_bytes: bytes,
+    reference_date: date,
+    secao: str,
+    debug_attrs: bool = False,
+) -> Optional[Publicacao]:
     try:
         root = ElementTree.fromstring(xml_bytes)
     except ElementTree.ParseError:
@@ -190,22 +247,34 @@ def _normalize(xml_bytes: bytes, reference_date: date) -> Optional[Publicacao]:
     if article is None:
         article = root
 
+    if debug_attrs:
+        # Ativado via DOU_DEBUG_XML_ATTRS=true (ver config.py). Loga os
+        # atributos crus do XML para identificarmos, com dado real, qual
+        # campo carrega o slug/URL amigável do artigo (ver nota no topo
+        # do arquivo sobre o link "Abrir no DOU").
+        logger.info("DEBUG atributos do <article>: %s", dict(article.attrib))
+
     titulo = _first_present(article, *_ATTR_TITULO)
     orgao = _first_present(article, *_ATTR_ORGAO)
     tipo_ato = _first_present(article, *_ATTR_TIPO)
     numero_ato = _first_present(article, *_ATTR_NUMERO, default="s/nº")
     art_id = _first_present(article, *_ATTR_ID)
+    slug = _first_present(article, *_ATTR_SLUG)
 
     corpo_texto = _extract_text(article)
     if not titulo:
         # Se não achamos um título nos atributos, usamos o começo do texto.
         titulo = corpo_texto[:200] if corpo_texto else "(sem título)"
 
-    link = (
-        f"https://www.in.gov.br/web/dou/-/{art_id}"
-        if art_id
-        else f"{INLABS_LEITURA_URL}?data={reference_date.strftime('%d-%m-%Y')}&secao=do2"
-    )
+    if slug:
+        # Só usamos link direto se tivermos um slug (nome amigável) —
+        # nunca um ID numérico puro, que não corresponde ao formato real
+        # das URLs do site (ex.: /web/dou/-/portaria-n-296-24096588).
+        link = f"https://www.in.gov.br/web/dou/-/{slug}"
+    else:
+        # Sem confirmação do campo certo, usamos o link de busca (que
+        # sempre abre) em vez de arriscar um link quebrado.
+        link = _build_search_link(reference_date, secao)
 
     return Publicacao(
         data_publicacao=reference_date.strftime("%d/%m/%Y"),
@@ -214,15 +283,17 @@ def _normalize(xml_bytes: bytes, reference_date: date) -> Optional[Publicacao]:
         tipo_ato=tipo_ato or "-",
         numero_ato=numero_ato,
         link=link,
-        raw={"xml_len": len(xml_bytes), "texto": corpo_texto[:2000]},
+        raw={"xml_len": len(xml_bytes), "texto": corpo_texto[:2000], "art_id": art_id},
     )
 
 
-def _matches_keywords(pub: Publicacao, keywords: list) -> bool:
-    haystack = _strip_accents(
-        f"{pub.titulo} {pub.orgao} {pub.raw.get('texto', '')}"
-    ).lower()
-    return any(_strip_accents(kw).lower() in haystack for kw in keywords)
+def _matches_keywords(pub: Publicacao, org_keywords: list) -> bool:
+    """Filtra pelo ÓRGÃO PUBLICADOR (quem publicou o ato), não pelo texto
+    do artigo. Isso evita falsos positivos como uma portaria de pessoal
+    de outro ministério que apenas cita o MDIC/Inmetro de passagem (ex.:
+    cessão de servidor)."""
+    haystack = _strip_accents(pub.orgao).lower()
+    return any(_strip_accents(kw).lower() in haystack for kw in org_keywords)
 
 
 def search_dou(
@@ -233,13 +304,18 @@ def search_dou(
     timeout: int = 30,
     inlabs_email: str = "",
     inlabs_password: str = "",
+    debug_xml_attrs: bool = False,
 ):
     """
     Ponto de entrada principal do módulo (agora via INLABS).
 
+    `keywords` aqui são tratadas como nomes/siglas do ÓRGÃO PUBLICADOR
+    (ex.: "MDIC", "Inmetro"), e o filtro é aplicado apenas sobre o campo
+    de órgão de cada publicação — não sobre o texto completo do artigo.
+
     Retorna (data_efetivamente_consultada, lista_de_Publicacao) já
-    filtrada pelas `keywords`. Levanta DouUnavailableError (ou a
-    subclasse InlabsAuthError) se não for possível concluir a consulta.
+    filtrada. Levanta DouUnavailableError (ou a subclasse
+    InlabsAuthError) se não for possível concluir a consulta.
     """
     ref_date = reference_date or get_reference_date()
 
@@ -269,14 +345,14 @@ def search_dou(
         for name in zf.namelist():
             if not name.lower().endswith(".xml"):
                 continue
-            pub = _normalize(zf.read(name), ref_date)
+            pub = _normalize(zf.read(name), ref_date, secao, debug_attrs=debug_xml_attrs)
             if pub is not None:
                 all_pubs.append(pub)
 
     filtered = [pub for pub in all_pubs if _matches_keywords(pub, keywords)]
 
     logger.info(
-        "DOU %s (INLABS): %s publicações na seção '%s', %s após filtro de palavras-chave.",
+        "DOU %s (INLABS): %s publicações na seção '%s', %s após filtro de órgão (MDIC/Inmetro).",
         ref_date, len(all_pubs), secao, len(filtered),
     )
     return ref_date, filtered
