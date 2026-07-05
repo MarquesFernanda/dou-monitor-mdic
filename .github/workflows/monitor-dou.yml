@@ -1,0 +1,56 @@
+name: Monitoramento Diário DOU - MDIC/Inmetro
+
+on:
+  schedule:
+    # 11h UTC = 08h em Brasília (BRT = UTC-3 o ano todo, sem horário de verão)
+    - cron: "0 11 * * *"
+  workflow_dispatch: {}  # permite rodar manualmente pela aba "Actions" do GitHub
+
+permissions:
+  contents: write  # necessário para o job commitar o relatório gerado de volta no repo
+
+jobs:
+  monitorar-dou:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Rodar monitoramento do DOU
+        env:
+          # --- Método de notificação --------------------------------------
+          NOTIFY_METHOD: "teams"          # troque para "email" ou "teams,email" se necessário
+
+          # --- Teams (Secret configurado em Settings > Secrets and variables) --
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+
+          # --- E-mail (só é usado se NOTIFY_METHOD incluir "email") -------
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+
+          # --- Busca no DOU (pode deixar como está) -----------------------
+          DOU_SECAO: "do2"
+          DOU_KEYWORDS: "MDIC,INMETRO,Instituto Nacional de Metrologia,Ministério do Desenvolvimento, Indústria, Comércio e Serviços"
+        run: python -m src.main
+
+      - name: Commitar relatório e página HTML (histórico + GitHub Pages)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/*.docx docs/index.html docs/historico.json
+          git diff --staged --quiet || git commit -m "Relatório DOU $(date -I)"
+          git push
