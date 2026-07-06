@@ -1,22 +1,3 @@
-"""
-Envio da notificação diária para o Microsoft Teams.
-
-ATENÇÃO — leia antes de configurar o webhook:
-O "Incoming Webhook" clássico do Teams (Conector do Office 365) foi
-DESATIVADO pela Microsoft entre 18 e 22/05/2026. Se o MDIC ainda tiver um
-webhook clássico configurado, ele já não funciona mais.
-
-O substituto oficial é o app "Workflows" (Power Automate) dentro do Teams,
-usando o modelo "Postar em um canal quando uma solicitação de webhook for
-recebida". Do ponto de vista deste script, a diferença é só a URL: você
-ainda faz um POST de um JSON simples {"text": "..."} para uma URL. Veja o
-passo a passo completo para gerar essa URL no README.md.
-
-O webhook (clássico ou via Workflow) NÃO permite anexar arquivos binários —
-apenas texto/HTML simples. Por isso enviamos um resumo das publicações do
-dia + um link para o relatório .docx completo, que fica salvo no próprio
-repositório do GitHub (pasta reports/).
-"""
 from __future__ import annotations
 
 import logging
@@ -28,7 +9,6 @@ from .dou_client import Publicacao
 
 logger = logging.getLogger(__name__)
 
-# Evita mensagens gigantes no Teams; a lista completa sempre está no .docx.
 MAX_ITEMS_IN_MESSAGE = 15
 
 
@@ -42,7 +22,7 @@ def _build_message_text(
     report_link: Optional[str],
 ) -> str:
     lines = [
-        f"📰 **Monitoramento Diário DOU - MDIC/Inmetro** ({reference_date_str})",
+        f" **Monitoramento Diário DOU - MDIC/Inmetro** ({reference_date_str})",
         "",
     ]
 
@@ -65,10 +45,10 @@ def _build_message_text(
 
     lines.append("")
     if report_link:
-        lines.append(f"📄 [Baixar relatório completo em Word]({report_link})")
+        lines.append(f" [Baixar relatório completo em Word]({report_link})")
     else:
         lines.append(
-            "📄 Relatório completo em Word gerado e salvo no repositório do "
+            " Relatório completo em Word gerado e salvo no repositório do "
             "GitHub (pasta `reports/`)."
         )
 

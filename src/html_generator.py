@@ -1,18 +1,3 @@
-"""
-Geração da página HTML pública (GitHub Pages) com o resultado do
-monitoramento do dia + histórico dos últimos dias.
-
-Essa é a via "simples" de distribuição do relatório: em vez de depender de
-Teams/OneDrive (que exigem TI), a Action publica uma página estática no
-GitHub Pages. Qualquer pessoa com o link acessa direto do navegador (ou do
-celular), sem precisar de login nem de conta no GitHub.
-
-Este módulo gera dois arquivos dentro de `docs/` (pasta usada pelo GitHub
-Pages):
-  - docs/index.html      -> sempre mostra o resultado do dia mais recente
-  - docs/historico.json  -> guarda um resumo de cada execução, para montar
-                             o histórico exibido no rodapé da página
-"""
 from __future__ import annotations
 
 import html
@@ -203,12 +188,12 @@ def generate_html_page(
 </head>
 <body>
   <div class="container">
-    <h1>📰 Monitoramento Diário DOU — MDIC/Inmetro</h1>
+    <h1> Monitoramento Diário DOU — MDIC/Inmetro</h1>
     <p class="subtitulo">Edição de {_esc(data_str)} · Seção 2 · atualizado em {_esc(atualizado_em)}</p>
 
     {_build_publicacoes_html(publicacoes)}
 
-    {'<p><a href="' + _esc(docx_link) + '" target="_blank" rel="noopener">📄 Baixar relatório completo em Word</a></p>' if docx_link else ''}
+    {'<p><a href="' + _esc(docx_link) + '" target="_blank" rel="noopener"> Baixar relatório completo em Word</a></p>' if docx_link else ''}
 
     {_build_historico_html(historico)}
 

@@ -1,10 +1,3 @@
-"""
-Fallback de notificação por e-mail via SMTP institucional.
-
-Use este caminho se a criação/uso de webhooks (ou do app Workflows) no
-Teams não for permitida pela política de segurança do MDIC. Diferente do
-Teams, o e-mail permite anexar o arquivo .docx de verdade.
-"""
 from __future__ import annotations
 
 import logging

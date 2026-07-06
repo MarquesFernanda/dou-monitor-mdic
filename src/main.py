@@ -1,23 +1,10 @@
-"""
-Ponto de entrada da automação de monitoramento do DOU (MDIC/Inmetro).
-
-Uso local:
-    python -m src.main
-
-Em produção, é executado pelo GitHub Actions (veja
-.github/workflows/monitor-dou.yml).
-
-Variáveis de ambiente relevantes: veja src/config.py e .env.example.
-"""
 from __future__ import annotations
 
 import logging
 import sys
 from typing import Optional
 
-# Carrega variáveis de um arquivo .env se ele existir (só é usado para rodar
-# localmente; no GitHub Actions as variáveis vêm dos Secrets e este bloco
-# simplesmente não encontra o arquivo e não faz nada).
+
 try:
     from dotenv import load_dotenv
 
@@ -40,14 +27,6 @@ logger = logging.getLogger("main")
 
 
 def _build_report_link(filename: str) -> Optional[str]:
-    """Monta o link do relatório dentro do repositório do GitHub.
-
-    Só funciona de verdade se quem for abrir o link também tiver acesso ao
-    repositório no GitHub (ou seja, se o repo for público, ou se todos os
-    destinatários no Teams também tiverem conta/acesso ao GitHub da
-    organização). Por isso o resumo completo já vai no corpo da mensagem do
-    Teams — este link é um "extra" para quem quiser o .docx formatado.
-    """
     if not config.GITHUB_REPOSITORY:
         return None
     return (
@@ -59,7 +38,7 @@ def _build_report_link(filename: str) -> Optional[str]:
 def run() -> int:
     methods = [m.strip().lower() for m in config.NOTIFY_METHOD.split(",") if m.strip()]
 
-    # 1) Buscar as publicações do dia no DOU -------------------------------
+
     try:
         reference_date, publicacoes = search_dou(
             keywords=config.DOU_KEYWORDS,
@@ -72,9 +51,6 @@ def run() -> int:
         )
     except DouUnavailableError as exc:
         logger.error("Falha ao consultar o DOU: %s", exc)
-        # Nunca falha em silêncio: gera uma página avisando que a checagem
-        # de hoje não pôde ser concluída, para quem acessar saber o motivo
-        # em vez de ver um 404 ou a página do dia anterior sem aviso.
         try:
             generate_error_page(str(exc), docs_dir=config.DOCS_DIR)
         except Exception:
@@ -85,12 +61,9 @@ def run() -> int:
                 f"O monitoramento do DOU falhou hoje: {exc}. "
                 f"Verifique manualmente em https://www.in.gov.br/leiturajornal",
             )
-        # Retorna 0 (não marca a Action como "failed"): o bloqueio do DOU é
-        # um problema externo e recorrente (ver README), não um bug da
-        # automação. O importante é que a página já avisa sobre a falha.
         return 0
 
-    # 2) Gerar o relatório em Word ------------------------------------------
+    
     filename = f"relatorio_dou_mdic_{reference_date.isoformat()}.docx"
     output_path = f"{config.REPORTS_DIR}/{filename}"
 
@@ -104,9 +77,6 @@ def run() -> int:
     reference_date_str = reference_date.strftime("%d/%m/%Y")
     exit_code = 0
 
-    # 2.1) Gerar/atualizar a página HTML pública (GitHub Pages) -----------
-    # Essa é a via simples de consulta: não depende de Teams nem de TI,
-    # só do link da página, que fica sempre no mesmo endereço.
     try:
         generate_html_page(
             publicacoes,
@@ -117,7 +87,6 @@ def run() -> int:
     except Exception:
         logger.exception("Falha ao gerar a página HTML (docs/index.html).")
 
-    # 3) Notificar --------------------------------------------------------
     if "teams" in methods:
         if not config.TEAMS_WEBHOOK_URL:
             logger.info(

@@ -1,7 +1,3 @@
-"""
-Geração do relatório diário em Word (.docx) com as publicações do DOU que
-mencionam o MDIC e/ou o Inmetro.
-"""
 from __future__ import annotations
 
 import logging
