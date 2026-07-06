@@ -5,13 +5,16 @@ import logging
 import unicodedata
 import zipfile
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import quote
 from xml.etree import ElementTree
 
 import holidays
 import requests
+
+
+BRASILIA_TZ = timezone(timedelta(hours=-3))
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,7 @@ _ATTR_ORGAO = ("artCategory", "pubName", "hierarchyStr", "orgao", "displayName")
 _ATTR_TIPO = ("artType", "tipo", "identifica")
 _ATTR_NUMERO = ("numberDocument", "artNumber", "numero")
 _ATTR_ID = ("id", "idMateria", "identifica")
+
 _ATTR_SLUG = ("urlTitle", "friendlyUrl", "slug", "idOficial", "pdfPage")
 
 
@@ -72,11 +76,8 @@ def _strip_accents(text: str) -> str:
 
 
 def get_reference_date(today: Optional[date] = None) -> date:
-    """
-    Retorna a data que deve ser consultada no DOU: o dia corrente, ou o
-    último dia útil anterior se cair em fim de semana/feriado nacional.
-    """
-    ref = today or date.today()
+    
+    ref = today or datetime.now(BRASILIA_TZ).date()
     while ref.weekday() >= 5 or ref in BR_HOLIDAYS:  # 5 = sábado, 6 = domingo
         ref -= timedelta(days=1)
     return ref
@@ -210,8 +211,11 @@ def _normalize(
     )
 
 
-#filtra pelo orgao (verificar)
 def _matches_keywords(pub: Publicacao, org_keywords: list) -> bool:
+    """Filtra pelo ÓRGÃO PUBLICADOR (quem publicou o ato), não pelo texto
+    do artigo. Isso evita falsos positivos como uma portaria de pessoal
+    de outro ministério que apenas cita o MDIC/Inmetro de passagem (ex.:
+    cessão de servidor)."""
     haystack = _strip_accents(pub.orgao).lower()
     return any(_strip_accents(kw).lower() in haystack for kw in org_keywords)
 
@@ -238,6 +242,7 @@ def search_dou(
             zip_bytes = _download_zip(session, cookie_value, ref_date, secao, timeout)
             break
         except InlabsAuthError:
+            
             raise
         except (requests.RequestException, DouUnavailableError) as exc:
             last_error = exc
