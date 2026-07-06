@@ -1,54 +1,46 @@
 name: Monitoramento Diário DOU - MDIC/Inmetro
-
 on:
   schedule:
     - cron: "0 11 * * *"
-  workflow_dispatch: {}
-
+  workflow_dispatch: {}  # permite rodar manualmente pela aba "Actions" do GitHub
 permissions:
-  contents: write 
-
+  contents: write  # necessário para o job commitar o relatório gerado de volta no repo
 jobs:
   monitorar-dou:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - name: Checkout do repositório
         uses: actions/checkout@v4
-
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Instalar dependências
         run: pip install -r requirements.txt
-
       - name: Rodar monitoramento do DOU
         env:
-          NOTIFY_METHOD: "teams"         
-
-         
+          
+          NOTIFY_METHOD: "teams"          
+          
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
-
-         
+          
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-
-         
+          
           INLABS_EMAIL: ${{ secrets.INLABS_EMAIL }}
           INLABS_SENHA: ${{ secrets.INLABS_SENHA }}
-
-         
+          
           DOU_SECAO: "do2"
-          DOU_KEYWORDS: "MDIC,INMETRO,Instituto Nacional de Metrologia,Ministério do Desenvolvimento, Indústria, Comércio e Serviços"
+          
+          DOU_KEYWORDS: "MDIC;Ministério do Desenvolvimento, Indústria, Comércio e Serviços;Inmetro;Instituto Nacional de Metrologia, Qualidade e Tecnologia"
+          
+          DOU_DEBUG_XML_ATTRS: "false"
         run: python -m src.main
-
       - name: Commitar relatório e página HTML (histórico + GitHub Pages)
         if: always()
         run: |
