@@ -1,5 +1,11 @@
 [
   {
+    "data_iso": "2026-07-24",
+    "data": "24/07/2026",
+    "quantidade": 10,
+    "docx_link": "https://github.com/MarquesFernanda/dou-monitor-mdic/blob/main/reports/relatorio_dou_mdic_2026-07-24.docx"
+  },
+  {
     "data_iso": "2026-07-23",
     "data": "23/07/2026",
     "quantidade": 2,
