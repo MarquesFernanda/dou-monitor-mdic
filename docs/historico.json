@@ -1,5 +1,11 @@
 [
   {
+    "data_iso": "2026-09-16",
+    "data": "16/09/2026",
+    "quantidade": 4,
+    "docx_link": "https://github.com/MarquesFernanda/dou-monitor-mdic/blob/main/reports/relatorio_dou_mdic_2026-09-16.docx"
+  },
+  {
     "data_iso": "2026-09-14",
     "data": "14/09/2026",
     "quantidade": 8,
@@ -172,11 +178,5 @@
     "data": "06/07/2026",
     "quantidade": 1,
     "docx_link": "https://github.com/MarquesFernanda/dou-monitor-mdic/blob/main/reports/relatorio_dou_mdic_2026-07-06.docx"
-  },
-  {
-    "data_iso": "2026-07-03",
-    "data": "03/07/2026",
-    "quantidade": 24,
-    "docx_link": "https://github.com/MarquesFernanda/dou-monitor-mdic/blob/main/reports/relatorio_dou_mdic_2026-07-03.docx"
   }
 ]
